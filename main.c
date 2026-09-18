@@ -5,17 +5,17 @@
 #define MAX_CLAMP 255
 
 typedef struct {
-    size_t width, height, channels;
+    int width, height, channels;
     unsigned char* data;
 } Image;
 
-Image* image_new(size_t width, size_t height, size_t channels) {
+Image* image_new(int width, int height, int channels) {
     Image* img = malloc(sizeof(Image));
     if (!img) return NULL;
     img->width = width;
     img->height = height;
     img->channels = channels;
-    size_t size = width * height * channels;
+    size_t size = (size_t)width * (size_t)height * (size_t)channels;
     img->data = malloc(size);
     if (!img->data) {
         free(img);
@@ -24,21 +24,11 @@ Image* image_new(size_t width, size_t height, size_t channels) {
     return img;
 }
 
-void print_img(const unsigned char img[][8], int rows) {
-    static const char* lv[] = {"  ", "..", "::", "--", "==", "**", "##", "@@"};
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < 8; j++) {
-            printf("%s", lv[img[i][j] / 32]);
-        }
-        printf("\n");
-    }
-}
-
 void image_print(const Image* img) {
     if (img->channels == 1) {
         static const char* lv[] = {"  ", "..", "::", "--", "==", "**", "##", "@@"};
-        for (size_t i = 0; i < img->height; i++) {
-            for (size_t j = 0; j < img->width; j++) {
+        for (int i = 0; i < img->height; i++) {
+            for (int j = 0; j < img->width; j++) {
                 printf("%s", lv[img->data[i * img->width + j] / 32]);
             }
             printf("\n");
@@ -53,14 +43,14 @@ void image_free(Image* img) {
     free(img);
 }
 
-unsigned char* image_at(Image* img, size_t y, size_t x) {
+unsigned char* image_at(const Image* img, int y, int x) {
     return img->data + (x + y * img->width) * img->channels;
 }
 
-void invert(unsigned char img[][8], int rows) {
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < 8; j++) {
-            img[i][j] = 255 - img[i][j];
+void invert(Image* img) {
+    for (int i = 0; i < img->height; i++) {
+        for (int j = 0; j < img->width; j++) {
+            *(img->data + i * img->width + j) = 255 - *(img->data + i * img->width + j);
         }
     }
 }
@@ -69,41 +59,41 @@ unsigned char rgb_to_luma(const unsigned char* rgb) {
     return (77 * rgb[0] + 150 * rgb[1] + 29 * rgb[2]) >> 8;
 }
 
-void to_gray(const unsigned char color[][8][3], unsigned char gray[][8], int rows) {
-
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < 8; j++) {
-            gray[i][j] = rgb_to_luma(color[i][j]);
+void to_gray(const Image* src, Image* dest) {
+    for (int i = 0; i < src->height; i++) {
+        for (int j = 0; j < src->width; j++) {
+            *(dest->data + i * dest->width + j) = rgb_to_luma(image_at(src, i, j));
         }
     }
 }
 
-static int avg_3x3(const unsigned char gray[][8], int y, int x, int rows) {
+static int avg_3x3(const Image* img, int y, int x) {
     int sum = 0;
     // 上一行
     int up = y - 1 < 0 ? 0 : y - 1;
     // 下一行
-    int down = y + 1 > rows - 1 ? rows - 1 : y + 1;
+    int down = y + 1 > img->height - 1 ? img->height - 1 : y + 1;
     // 左一列
     int left = x - 1 < 0 ? 0 : x - 1;
     // 右一列
-    int right = x + 1 > 7 ? 7 : x + 1;
-    sum += gray[y][x];
-    sum += gray[up][x];
-    sum += gray[down][x];
-    sum += gray[y][left];
-    sum += gray[y][right];
-    sum += gray[up][left];
-    sum += gray[up][right];
-    sum += gray[down][left];
-    sum += gray[down][right];
+    int right = x + 1 >= img->width ? img->width - 1 : x + 1;
+
+    sum += img->data[y * img->width + x];
+    sum += img->data[up * img->width + x];
+    sum += img->data[down * img->width + x];
+    sum += img->data[y * img->width + left];
+    sum += img->data[y * img->width + right];
+    sum += img->data[up * img->width + left];
+    sum += img->data[up * img->width + right];
+    sum += img->data[down * img->width + left];
+    sum += img->data[down * img->width + right];
     return sum / 9;
 }
 
-void blur3x3(const unsigned char gray[][8], unsigned char out[][8], int rows) {
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < 8; j++) {
-            out[i][j] = avg_3x3(gray, i, j, rows);
+void blur3x3(const Image* src, Image* dest) {
+    for (int i = 0; i < src->height; i++) {
+        for (int j = 0; j < src->width; j++) {
+            *(dest->data + i * src->width + j) = avg_3x3(src, i, j);
         }
     }
 }
@@ -116,93 +106,55 @@ static int abs_m(int x) {
 }
 
 // 找边缘
-static int sobel_3(const unsigned char gray[][8], int y, int x, int rows) {
+static int sobel_3(const Image* src, int y, int x) {
     // 上一行
     int up = y - 1 < 0 ? 0 : y - 1;
     // 下一行
-    int down = y + 1 > rows - 1 ? rows - 1 : y + 1;
+    int down = y + 1 > src->height - 1 ? src->height - 1 : y + 1;
     // 左一列
     int left = x - 1 < 0 ? 0 : x - 1;
     // 右一列
-    int right = x + 1 > 7 ? 7 : x + 1;
-    int Gx = (gray[up][right] + 2 * gray[y][right] + gray[down][right]) -
-             (gray[up][left] + 2 * gray[y][left] + gray[down][left]);
+    int right = x + 1 >= src->width ? src->width - 1 : x + 1;
 
-    int Gy = (gray[down][left] + 2 * gray[down][x] + gray[down][right]) -
-             (gray[up][left] + 2 * gray[up][x] + gray[up][right]);
+    int Gx = (src->data[up * src->width + right] + 2 * src->data[y * src->width + right] + src->data[down * src->width + right]) -
+             (src->data[up * src->width + left] + 2 * src->data[y * src->width + left] + src->data[down * src->width + left]);
+
+    int Gy = (src->data[down * src->width + left] + 2 * src->data[down * src->width + x] + src->data[down * src->width + right]) -
+             (src->data[up * src->width + left] + 2 * src->data[up * src->width + x] + src->data[up * src->width + right]);
     int g = abs_m(Gx) + abs_m(Gy);
-    // printf("Gx=%04d Gy=%04d\n", Gx, Gy);
     if (g > MAX_CLAMP) g = MAX_CLAMP;
     return g;
 }
 
-void sobel(const unsigned char gray[][8], unsigned char out[][8], int rows) {
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < 8; j++) {
-            out[i][j] = sobel_3(gray, i, j, rows);
+void sobel(const Image* src, Image* dest) {
+    for (int i = 0; i < src->height; i++) {
+        for (int j = 0; j < src->width; j++) {
+            *(dest->data + i * src->width + j) = sobel_3(src, i, j);
         }
     }
 }
 
 int main() {
-    // unsigned char img[8][8] = {
-    //     {0, 0, 255, 0, 0, 255, 0, 0},
-    //     {0, 0, 255, 0, 0, 255, 0, 0},
-    //     {0, 0, 255, 0, 0, 255, 0, 0},
-    //     {0, 0, 255, 255, 255, 255, 0, 0},
-    //     {0, 0, 255, 0, 0, 255, 0, 0},
-    //     {0, 0, 255, 0, 0, 255, 0, 0},
-    //     {0, 0, 255, 0, 0, 255, 0, 0},
-    //     {0, 0, 255, 0, 0, 255, 0, 0},
-    // };
-    // print_img(img, 8);
-    // invert(img, 8);
-    // printf("\n");
-    // print_img(img, 8);
+    Image* image = image_new(8, 8, 3);
+    printf("%d %d %d \n", image->height, image->width, image->channels);
+    int row[8][3] = {
+        {255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 255}, {0, 0, 0}, {128, 128, 128}, {255, 255, 0}, {0, 255, 255}};
 
-    // unsigned char color[8][8][3] = {
-    //     {{255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 255}, {0, 0, 0}, {128, 128, 128}, {255, 255, 0}, {0, 255, 255}},
-    //     {{255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 255}, {0, 0, 0}, {128, 128, 128}, {255, 255, 0}, {0, 255, 255}},
-    //     {{255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 255}, {0, 0, 0}, {128, 128, 128}, {255, 255, 0}, {0, 255, 255}},
-    //     {{255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 255}, {0, 0, 0}, {128, 128, 128}, {255, 255, 0}, {0, 255, 255}},
-    //     {{255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 255}, {0, 0, 0}, {128, 128, 128}, {255, 255, 0}, {0, 255, 255}},
-    //     {{255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 255}, {0, 0, 0}, {128, 128, 128}, {255, 255, 0}, {0, 255, 255}},
-    //     {{255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 255}, {0, 0, 0}, {128, 128, 128}, {255, 255, 0}, {0, 255, 255}},
-    //     {{255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 255}, {0, 0, 0}, {128, 128, 128}, {255, 255, 0}, {0, 255, 255}},
-    // };
-
-    // unsigned char rgb[8][8];
-    // unsigned char rgb_blur[8][8];
-    // memset(color[2], 0, sizeof(color[2]));
-    // to_gray(color, rgb, 8);
-    // print_img(rgb, 8);
-    // blur3x3(rgb, rgb_blur, 8);
-    // print_img(rgb_blur, 8);
-
-    // unsigned char edge_src[8][8];
-    // unsigned char edge_mag[8][8];
-    // for (int i = 0; i < 8; i++) {
-    //     for (int j = 0; j < 8; j++) {
-    //         if (j <= 3)
-    //             edge_src[i][j] = 0;
-    //         else
-    //             edge_src[i][j] = 255;
-    //     }
-    // }
-    // sobel(edge_src, edge_mag, 8);
-    // print_img(edge_mag, 8);
-    Image* image = image_new(8, 8, 1);
-    printf("%zu %zu %zu \n", image->height, image->width, image->channels);
-    int arr[] = {76, 149, 28, 255, 0, 128, 226, 178};
-    for (size_t i = 0; i < 8; i++) {
-        for (size_t j = 0; j < 8; j++) {
-            if (i == 1)
-                image->data[i * image->width + j] = 0;
-            else
-                image->data[i * image->width + j] = arr[j];
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            unsigned char* p = image_at(image, i, j);
+            p[0] = row[j][0];
+            p[1] = row[j][1];
+            p[2] = row[j][2];
         }
     }
-    image_print(image);
+    Image* gray = image_new(8, 8, 1);
+    to_gray(image, gray);
+    for (int j = 0; j < 8; j++) {
+        printf("%d ", gray->data[j]);
+    }
+
     image_free(image);
+    image_free(gray);
     return 0;
 }
