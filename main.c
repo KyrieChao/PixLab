@@ -27,11 +27,15 @@ int main() {
     // image_free(gray);
 
     Image* img = bmp_load("test.bmp");
-    if (img != NULL) {
-        printf("width=%d height=%d channels=%d\n", img->width, img->height, img->channels);
-    } else {
+    if (img == NULL) {
         printf("error\n");
+        return -1;
     }
+    printf("width=%d height=%d channels=%d\n", img->width, img->height, img->channels);
+    Image* gray = image_new(img->width, img->height, 1);
+    to_gray(img, gray);
+    image_print(gray);
+    image_free(gray);
     image_free(img);
     return 0;
 }
