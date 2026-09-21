@@ -8,6 +8,11 @@ void invert(Image* img) {
     }
 }
 
+void invert_map(Image* img) {
+    size_t n = (size_t)img->width * img->height * img->channels;
+    for (size_t k = 0; k < n; k++) img->data[k] = 255 - img->data[k];
+}
+
 unsigned char rgb_to_luma(const unsigned char* rgb) {
     return (77 * rgb[0] + 150 * rgb[1] + 29 * rgb[2]) >> 8;
 }

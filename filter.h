@@ -1,9 +1,13 @@
-
 #ifndef FILTER_H
 #define FILTER_H
 #include "image.h"
+#include <stddef.h>
 
+// 只接受单通道图
 void invert(Image* img);
+
+// 泛化
+void invert_map(Image* img);
 
 unsigned char rgb_to_luma(const unsigned char* rgb);
 
