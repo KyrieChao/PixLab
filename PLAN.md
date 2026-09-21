@@ -1,173 +1,88 @@
 # PixLab 项目计划
 
-这是一个用 C 语言实现的 BMP 图像处理练习项目，目标是从“内存中的图像处理”逐步过渡到“真实 BMP 文件的读写和滤镜处理”。
+这是一个用 C 语言实现的 BMP 图像处理练习项目，从"内存中的图像处理"逐步过渡到"真实 BMP 文件的读写和滤镜处理"。
 
-最终形态（目标）：
+最终形态：
 
 ```bash
 pixlab input.bmp output.bmp gray
 pixlab input.bmp output.bmp invert
 pixlab input.bmp output.bmp blur
 pixlab input.bmp output.bmp sobel
+pixlab input.bmp output.bmp gray,blur,sobel
 ```
 
 ---
 
-## 当前实际状态
+## 里程碑状态（全部完成）
 
-截至目前，项目已经完成：
+### 阶段一：图像算法（内存中操作像素）
 
-- 图像容器与像素访问接口：`Image`、`image_new`、`image_free`、`image_at`
-- 基础滤镜：`invert`、`to_gray`、`blur3x3`、`sobel`
-- 内存级图像处理：采用单通道和三通道数据布局进行实验与验证
-- BMP 文件头读取与基本校验：`bmp_load` 已经能够读取 `BITMAPFILEHEADER` 和 `BITMAPINFOHEADER`，并校验文件类型、位深、压缩方式与合法尺寸
+| 里程碑 | 状态 | 交付 |
+|---|---|---|
+| M1 图像表示与字符显示 | ✅ | `image_print` |
+| M2 负片处理 | ✅ | `invert` |
+| M3 灰度化 | ✅ | `rgb_to_luma`、`to_gray` |
+| M4 均值模糊 | ✅ | `blur3x3` |
+| M5 Sobel 边缘检测 | ✅ | `sobel` |
+| M6a Image 容器 | ✅ | `image_new`、`image_free`、`image_at` |
+| M6b 滤镜迁到 Image* | ✅ | 全部改用 Image 结构体 |
+| M6c 拆文件 | ✅ | `image.h/c`、`filter.h/c`、`main.c` |
 
-目前仍在推进：
+### 阶段二：BMP 文件读写
 
-- 真实像素数据完整解码（M8）
-- BMP 原样写回（M9）
-- 命令行参数解析（M12/M13）
-- 输入输出文件的完整链路
+| 里程碑 | 状态 | 交付 |
+|---|---|---|
+| M7 读取 BMP 文件头 | ✅ | 校验文件类型、位深、压缩方式 |
+| M8 读取像素数据 | ✅ | 处理 padding、BGR→RGB、自底向上 |
+| M9 原样写回（锚点） | ✅ | `fc /b` 字节级一致 |
+| M10 接入滤镜 | ✅ | `pixlab in.bmp out.bmp gray` |
 
-也就是说，项目现在处于“算法核心已建立，且 BMP 读头阶段已达成 M7”的状态，当前重点已经转到 M8 的像素数据读取。
+### 阶段三：命令行接口
 
----
-
-## 学习路线与分阶段设计
-
-### 阶段一：图像算法（已完成核心）
-
-这一阶段的重点是理解图像的“数学层”，不依赖文件，直接在内存中操作像素。
-
-#### M1 图像表示与字符显示 ✅
-- 目标：用一维缓冲表示二维图像
-- 关键：`x/y` 与一维索引的换算
-- 交付：`image_print` 相关逻辑
-
-#### M2 负片处理 ✅
-- 目标：理解 `unsigned char` 的回绕行为
-- 交付：`invert`
-
-#### M3 灰度化 ✅
-- 目标：RGB 转亮度值
-- 交付：`rgb_to_luma`、`to_gray`
-
-#### M4 均值模糊 ✅
-- 目标：3x3 邻域卷积、边界夹取
-- 交付：`blur3x3`
-
-#### M5 Sobel 边缘检测 ✅
-- 目标：梯度计算、绝对值、阈值截断
-- 交付：`sobel`
-
-#### M6 Image 容器与整合 ✅
-- 目标：把算法从裸数组迁到 `Image` 结构体
-- 交付：`image_new` / `image_free` / `image_at`
-
-### 阶段二：BMP 文件读写（当前重点）
-
-这个阶段是项目的“桥接层”，用于把内存图像和真实文件连接起来。
-
-#### M7 读取 BMP 文件头 ✅ 已完成
-- 目标：读取 `BITMAPFILEHEADER` 和 `BITMAPINFOHEADER`
-- 关键：宽高、位深、压缩类型、合法尺寸检查
-- 当前状态：代码已经实现文件头读取和基本校验，能够识别 BMP 文件并拿到图片参数
-
-#### M8 读取像素数据 ⏳ 当前重点
-- 目标：处理行 padding、BGR 顺序、自底向上存储
-- 关键：真正把像素解码进 `Image`
-
-#### M9 原样写回 ⏳
-- 目标：读入后再写出，保持字节一致
-- 这是最关键的锚点，确保不是“看起来像对，但格式错了”
-
-#### M10 接入滤镜 ⏳
-- 目标：`pixlab in.bmp out.bmp gray` 这种能力
-
-#### M11 额外位深与健壮性 ⏳（可选）
-- 目标：支持不同图像格式和错误处理
-
-### 阶段三：命令行接口 ⏳
-
-#### M12 参数解析
-- 目标：`argc` / `argv` 解析
-- 交付：输入、输出和滤镜名分发
-
-#### M13 多滤镜串联（可选）
-- 目标：像 `gray,blur,sobel` 这种链式处理
+| 里程碑 | 状态 | 交付 |
+|---|---|---|
+| M12 参数解析 | ✅ | `argc/argv` 解析、help 信息 |
+| M13 多滤镜串联 | ✅ | `gray,blur,sobel` 链式处理 |
 
 ---
 
-## 当前代码结构
+## 代码结构
 
 ```text
 image_processing_tool/
-├── main.c              # 当前入口，仍在调试/验证阶段
-├── image.h             # Image 结构体与 API 声明
-├── image.c             # 图像容器与 BMP 基础加载逻辑
+├── main.c              # CLI 入口：参数解析 + 滤镜链调度
+├── image.h             # Image 结构体、BMP 读写声明
+├── image.c             # 图像容器、bmp_load、bmp_save
 ├── filter.h            # 滤镜函数声明
 ├── filter.c            # invert / gray / blur / sobel
-├── generate_bmp.py     # 可选的 BMP 生成脚本
-├── test.bmp            # 当前用于测试的样例文件
-├── PLAN.md             # 项目计划
-└── README.md           # 项目说明文档
+├── test.c              # 独立测试入口（BMP 原样写回锚点）
+├── generate_bmp.py     # BMP 生成脚本
+├── test.bmp            # 测试样例
+├── PLAN.md             # 本文件
+└── README.md           # 项目说明
 ```
 
 ---
 
 ## 构建方式
 
-在当前目录下执行：
-
 ```bash
-gcc -Wall -Wextra main.c image.c filter.c -o pixlab
+gcc -Wall -Wextra -g image.c filter.c main.c -o pixlab
 ```
 
-如果只想调试算法层，可以直接编译和运行 `main.c` 中的测试逻辑；如果要接入真实 BMP，则需要继续完成 `bmp_load` 和写回逻辑。
+或测试锚点：
+
+```bash
+gcc -Wall -Wextra -g image.c filter.c test.c -o test.exe
+```
 
 ---
 
-## 当前已知问题
+## 验收记录
 
-1. `bmp_load` 只读取了文件头，尚未真正加载像素数据。
-2. `main.c` 当前更像实验入口，不是最终 CLI 程序。
-3. BMP 的 BGR / padding / 自底向上存储仍需完整实现。
-4. 还没有统一的参数解析和错误输出机制。
-
----
-
-## 下一步优先级
-
-按顺序推进，最重要的是：
-
-1. 完成 BMP 像素数据的真正读取
-2. 完成原样写回并验证字节一致性
-3. 接入图像处理滤镜
-4. 设计命令行参数接口
-5. 最后补齐错误处理与扩展
-
----
-
-## 学习原则
-
-这个项目的关键不是“把功能写完”，而是建立清晰的工程节奏：
-
-- 先保证算法正确
-- 再保证文件格式正确
-- 再保证命令行接口稳定
-- 最后才考虑扩展和鲁棒性
-
-只有每个里程碑都能用明确的验收标准验证，后续才不会陷入“看起来能跑，但不知道哪里错了”的状态。
-
----
-
-## 适合停点
-
-每一个完成的里程碑都可以视为一个“干净停点”：
-
-- 算法验证完成
-- BMP 头解析完成
-- 像素正确读取完成
-- 文件原样写回完成
-
-只要有一个阶段已经通过验收，就可以停下来，避免半途而废。
+- M4 模糊：`100 84 144 94 127 118 177 194`
+- M5 Sobel：`0 0 0 255 255 0 0 0`
+- M6a Image：`8 8 1` 字符画正确
+- M8 灰度化：`76 149 28 255 0 128 226 178`
+- M9 锚点：`fc /b test.bmp out.bmp` → `no differences encountered`
