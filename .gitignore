@@ -1,3 +1,13 @@
+# 构建产物
 *.exe
 *.o
 *.obj
+
+# 测试样本产出（由 make samples / make exotic 生成）
+/samples/
+
+# 图像文件一律忽略……
+*.bmp
+
+# ……但往返锚点用的固定样本必须跟踪
+!tests/fixtures/test.bmp
